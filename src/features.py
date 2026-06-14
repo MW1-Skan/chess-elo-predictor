@@ -36,14 +36,19 @@ BLITZ_MAX = 480         # < 8 min
 RAPID_MAX = 1500        # < 25 min; >= 1500 is classical
 
 # Columns that encode the result of the game — forbidden as Task A features.
-LEAKAGE_COLS_OUTCOME = ["winner", "victory_status", "moves"]
+# `turns` (move count) is included: the side delivering mate / forcing resignation
+# makes the last move, so the *parity* of the move count near-determines the winner
+# (an odd ply count -> white won ~91% of the time in this data). The PRD allows
+# move_count as a post-hoc feature, but that parity makes it effective leakage, so
+# Task A is kept to genuine pre-game conditions. `turns` is still a fair Task B input.
+LEAKAGE_COLS_OUTCOME = ["winner", "victory_status", "moves", "turns"]
 # Columns the Task B target is derived from — forbidden as Task B features.
 LEAKAGE_COLS_RATING = ["avg_rating", "white_rating", "black_rating", "rating_diff"]
 
 # Feature groups per task (column names in the *engineered* frame).
 OUTCOME_NUMERIC = [
     "white_rating", "black_rating", "rating_diff", "avg_rating",
-    "turns", "base_seconds", "increment_seconds", "opening_ply",
+    "base_seconds", "increment_seconds", "opening_ply",
 ]
 OUTCOME_CATEGORICAL = ["rated", "time_control", "opening_eco"]
 
