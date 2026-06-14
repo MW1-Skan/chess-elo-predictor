@@ -100,24 +100,24 @@ def assert_no_leakage(X: pd.DataFrame, task: str) -> None:
         )
 
 
-def get_xy(df: pd.DataFrame, task: str) -> tuple[pd.DataFrame, pd.Series]:
-    """Return (X, y) for the given task from an engineered frame.
+def select_features(df: pd.DataFrame, task: str) -> pd.DataFrame:
+    """Engineer and select the feature matrix X for ``task`` (no target needed).
 
     Runs the leakage guard before returning, so it is impossible to obtain a
-    feature matrix that contains a forbidden column.
+    feature matrix that contains a forbidden column. Used at both train and
+    inference time (inference has no target column).
     """
-    eng = engineer(df)
-    if task == "outcome":
-        cols = OUTCOME_NUMERIC + OUTCOME_CATEGORICAL
-        y = eng[TARGET_OUTCOME]
-    elif task == "rating":
-        cols = RATING_NUMERIC + RATING_CATEGORICAL
-        y = eng[TARGET_RATING]
-    else:
-        raise ValueError(f"Unknown task {task!r}; expected 'outcome' or 'rating'.")
-
-    X = eng[cols].copy()
+    numeric, categorical = feature_columns(task)
+    X = engineer(df)[numeric + categorical].copy()
     assert_no_leakage(X, task)
+    return X
+
+
+def get_xy(df: pd.DataFrame, task: str) -> tuple[pd.DataFrame, pd.Series]:
+    """Return (X, y) for training the given task."""
+    target = TARGET_OUTCOME if task == "outcome" else TARGET_RATING
+    X = select_features(df, task)
+    y = engineer(df)[target]
     return X, y
 
 
