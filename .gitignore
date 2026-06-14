@@ -1,0 +1,27 @@
+# Raw data is not committed — see README for how to obtain it.
+data/raw/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Environments
+.venv/
+venv/
+.env
+
+# uv
+.uv/
+
+# OS / editor
+.DS_Store
+*Zone.Identifier
+
+# Local Claude Code settings
+.claude/
+
+# Notebook scratch outputs are kept (committed) so the EDA renders on GitHub,
+# but large model artifacts are not.
