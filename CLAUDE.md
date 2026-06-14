@@ -4,9 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-This repo is **pre-implementation**: it currently contains only `PRD_chess_elo_predictor.md`, the
-authoritative spec. Build the project by working through the PRD's **§14 Build order**. The PRD is
-the source of truth for scope, structure, and the definition of done — read it before acting.
+**Implemented** (PRD §14 build order complete). The full pipeline, FastAPI service, Docker
+packaging, tests, EDA notebook, and docs exist and run. `PRD_chess_elo_predictor.md` remains the
+authoritative spec. Honest headline metrics (from `models/metrics.json`, seed 42): Task A acc 0.619
+(ties the higher-rated heuristic, beats majority-class); Task B MAE 179, R² 0.257 (beats
+predict-mean). 20 pytest tests pass; `docker build`/`run` serves `/health` + `/predict`.
+
+Key non-obvious decision: **Task A excludes `move_count`** because move-count parity near-determines
+the winner — see the README "Key design decisions" and the memory note. Don't reintroduce it to
+make Task A look better.
 
 ## What this is
 
