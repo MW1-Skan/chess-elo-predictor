@@ -29,6 +29,13 @@ def test_health():
     assert r.json() == {"status": "ok"}
 
 
+def test_index_serves_html():
+    r = client.get("/")
+    assert r.status_code == 200
+    assert "text/html" in r.headers["content-type"]
+    assert "Chess Elo Predictor" in r.text
+
+
 def test_predict_outcome_shape():
     r = client.post("/predict", json=OUTCOME_REQ)
     assert r.status_code == 200

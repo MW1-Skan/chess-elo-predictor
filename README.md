@@ -1,5 +1,17 @@
 # Chess Game-Outcome & Elo Predictor
 
+> Two honest predictions from a *completed* Lichess game — who won, and how strong the
+> players were — packaged as a reproducible, tested, deployable ML service rather than a
+> notebook.
+
+**Stack:** Python 3.12 · scikit-learn · FastAPI · pydantic v2 · Docker · Google Cloud Run · uv
+**Status:** **Live on Cloud Run** · trained & evaluated (seed 42) · reproducible from source.
+
+**Live demo:** https://chess-elo-1011959788820.europe-west9.run.app — an interactive form
+to try both predictions in the browser; raw API docs at
+[`/docs`](https://chess-elo-1011959788820.europe-west9.run.app/docs).
+(Scales to zero, so the first request after idle has a few-second cold start.)
+
 A small, honest, end-to-end ML project that predicts two things from features of a
 **completed** Lichess game:
 
@@ -158,13 +170,43 @@ opening/cadence fields); omit the player ratings.
 
 ## Deployment
 
+### Docker (works today)
+
 ```bash
 docker build -t chess-elo .
 docker run -p 8080:8080 chess-elo      # serves /health and /predict
 ```
 
-The container binds to `$PORT` (default 8080), so it runs on Cloud Run (Phase 4)
-with no changes. The persisted models are baked into the image.
+The container installs runtime dependencies only and bakes the persisted models into the
+image, so it starts with no external state. It binds to `$PORT` (default 8080).
+
+### Google Cloud Run (live)
+
+Live at **https://chess-elo-1011959788820.europe-west9.run.app** (region `europe-west9`,
+Paris). The image listens on `$PORT` and bakes in its own models, so it deploys unchanged —
+no code edits, no env vars, no Vertex/IAM grants (CPU-only scikit-learn, no managed-AI
+calls). One command from the repo root builds and deploys it:
+
+```bash
+gcloud run deploy chess-elo --source . \
+  --region europe-west9 \
+  --allow-unauthenticated \
+  --cpu 1 --memory 512Mi \
+  --min-instances 0 --max-instances 2   # scale to zero; cap cost
+```
+
+`--source .` builds the existing Dockerfile via Cloud Build, pushes it to Artifact Registry,
+and deploys. Cloud Run injects `$PORT` automatically; `--min-instances 0` lets the service
+scale to zero between requests (a few-second cold start on the first hit after idle).
+
+Smoke-test the live service:
+
+```bash
+URL=$(gcloud run services describe chess-elo --region europe-west9 --format='value(status.url)')
+curl "$URL/health"
+curl -X POST "$URL/predict" -H 'Content-Type: application/json' \
+  -d '{"task":"outcome","features":{"rated":true,"increment_code":"10+0","opening_eco":"C50","opening_ply":5,"white_rating":1800,"black_rating":1500}}'
+```
 
 ## Limitations & next steps
 
@@ -179,9 +221,11 @@ with no changes. The persisted models are baked into the image.
 
 ## Cost
 
-Zero external cost: a public dataset, CPU-only scikit-learn, local training in
-seconds, no paid APIs. The Docker image is a slim CPU container suitable for a
-small Cloud Run instance.
+Zero external cost to build and run: a public dataset, CPU-only scikit-learn, local
+training in seconds, no paid AI/inference APIs. On Cloud Run with `--min-instances 0`
+the service scales to zero, so at portfolio traffic the cost is effectively **$0/month**
+(within the free tier) — billing only accrues per request while serving, dominated by the
+1 vCPU / 512 MiB instance-seconds, not by any model calls.
 
 ## Repository structure
 
@@ -194,7 +238,9 @@ chess_elo_predictor/
 │   ├── features.py        # engineering + leakage guards + preprocessor
 │   ├── train.py           # baselines, CV, models, importance, persist
 │   ├── evaluate.py        # metric helpers
-│   └── api/app.py         # FastAPI service
+│   └── api/
+│       ├── app.py         # FastAPI service (/, /health, /predict)
+│       └── static/        # single-page demo UI served at /
 ├── models/                # persisted pipelines + metrics.json
 ├── tests/                 # data, leakage, model-beats-baseline, API
 ├── Dockerfile
