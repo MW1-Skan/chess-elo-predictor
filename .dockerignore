@@ -1,0 +1,14 @@
+.git
+.venv
+venv
+data/raw
+data/processed
+notebooks
+tests
+__pycache__
+*.pyc
+.pytest_cache
+.ipynb_checkpoints
+.claude
+*Zone.Identifier
+PRD_chess_elo_predictor.md
