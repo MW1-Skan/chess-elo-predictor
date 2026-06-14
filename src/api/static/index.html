@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chess Elo Predictor</title>
+  <style>
+    :root {
+      --bg: #2b2926; --panel: #353330; --ink: #f3efe7; --muted: #b3ada1;
+      --line: #4a4742; --accent: #769656; --accent-dim: #5d7a44;
+      --white-sq: #eeeed2; --black-sq: #769656; --draw: #c9a227;
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--ink);
+      font: 16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      display: flex; justify-content: center; padding: 32px 16px;
+    }
+    .wrap { width: 100%; max-width: 760px; }
+    h1 { font-size: 1.6rem; margin: 0 0 4px; }
+    h1 .pc { color: var(--accent); }
+    .sub { color: var(--muted); margin: 0 0 20px; font-size: .95rem; }
+    .sub a { color: var(--accent); }
+    .card { background: var(--panel); border: 1px solid var(--line);
+      border-radius: var(--radius); padding: 20px; margin-bottom: 18px; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 18px; }
+    .tab { flex: 1; padding: 12px; text-align: center; cursor: pointer;
+      background: var(--panel); border: 1px solid var(--line); color: var(--muted);
+      border-radius: var(--radius); font-weight: 600; transition: .15s; }
+    .tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .tab small { display: block; font-weight: 400; font-size: .78rem; opacity: .85; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    label { display: block; font-size: .82rem; color: var(--muted); margin-bottom: 4px; }
+    input, select {
+      width: 100%; padding: 9px 10px; background: var(--bg); color: var(--ink);
+      border: 1px solid var(--line); border-radius: 8px; font-size: .95rem; }
+    .check { display: flex; align-items: center; gap: 8px; margin-top: 22px; }
+    .check input { width: auto; }
+    .check label { margin: 0; }
+    button.go {
+      margin-top: 18px; width: 100%; padding: 13px; font-size: 1rem; font-weight: 700;
+      background: var(--accent); color: #fff; border: none; border-radius: 10px;
+      cursor: pointer; transition: .15s; }
+    button.go:hover { background: var(--accent-dim); }
+    button.go:disabled { opacity: .6; cursor: progress; }
+    .hide { display: none; }
+    .result { min-height: 10px; }
+    .verdict { font-size: 1.3rem; font-weight: 700; margin: 0 0 14px; }
+    .bar-row { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
+    .bar-label { width: 56px; font-size: .85rem; color: var(--muted); }
+    .bar-track { flex: 1; background: var(--bg); border-radius: 6px; overflow: hidden; height: 24px; }
+    .bar-fill { height: 100%; border-radius: 6px; transition: width .4s ease; }
+    .bar-fill.white { background: var(--white-sq); }
+    .bar-fill.black { background: #6a6a6a; }
+    .bar-fill.draw  { background: var(--draw); }
+    .bar-pct { width: 52px; text-align: right; font-variant-numeric: tabular-nums; }
+    .rating-big { font-size: 3rem; font-weight: 800; color: var(--accent); margin: 6px 0; }
+    .err { color: #e0796b; font-size: .9rem; }
+    .note { color: var(--muted); font-size: .8rem; margin-top: 14px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1><span class="pc">♟</span> Chess Elo Predictor</h1>
+    <p class="sub">
+      Two predictions from a <em>completed</em> Lichess game. Powered by a scikit-learn model
+      on FastAPI. &nbsp;·&nbsp; <a href="/docs">API docs</a>
+    </p>
+
+    <div class="tabs">
+      <div class="tab active" data-task="outcome">Who won?<small>predict white / black / draw</small></div>
+      <div class="tab" data-task="rating">How strong?<small>predict average rating</small></div>
+    </div>
+
+    <div class="card">
+      <form id="form">
+        <div class="grid">
+          <div>
+            <label for="opening_eco">Opening (ECO code)</label>
+            <input id="opening_eco" value="C50" />
+          </div>
+          <div>
+            <label for="opening_ply">Opening length (plies)</label>
+            <input id="opening_ply" type="number" value="5" min="0" max="200" />
+          </div>
+          <div>
+            <label for="increment_code">Time control (base+inc)</label>
+            <input id="increment_code" value="10+0" />
+          </div>
+          <div class="check">
+            <input id="rated" type="checkbox" checked />
+            <label for="rated">Rated game</label>
+          </div>
+
+          <!-- Outcome-only -->
+          <div class="f-outcome">
+            <label for="white_rating">White rating</label>
+            <input id="white_rating" type="number" value="1800" min="100" max="4000" />
+          </div>
+          <div class="f-outcome">
+            <label for="black_rating">Black rating</label>
+            <input id="black_rating" type="number" value="1500" min="100" max="4000" />
+          </div>
+
+          <!-- Rating-only -->
+          <div class="f-rating hide">
+            <label for="turns">Move count (turns)</label>
+            <input id="turns" type="number" value="60" min="1" max="600" />
+          </div>
+          <div class="f-rating hide">
+            <label for="winner">Winner</label>
+            <select id="winner"><option>white</option><option>black</option><option>draw</option></select>
+          </div>
+          <div class="f-rating hide">
+            <label for="victory_status">How it ended</label>
+            <select id="victory_status">
+              <option>mate</option><option>resign</option><option>outoftime</option><option>draw</option>
+            </select>
+          </div>
+        </div>
+
+        <button class="go" type="submit">Predict</button>
+      </form>
+    </div>
+
+    <div class="card result" id="result" style="display:none"></div>
+    <p class="note">
+      Hosted on Google Cloud Run with scale-to-zero — the very first request after a quiet
+      spell may take a few seconds to wake the container.
+    </p>
+  </div>
+
+  <script>
+    let task = "outcome";
+    const $ = (id) => document.getElementById(id);
+    const tabs = document.querySelectorAll(".tab");
+    const result = $("result");
+
+    tabs.forEach(t => t.addEventListener("click", () => {
+      tabs.forEach(x => x.classList.remove("active"));
+      t.classList.add("active");
+      task = t.dataset.task;
+      document.querySelectorAll(".f-outcome").forEach(e => e.classList.toggle("hide", task !== "outcome"));
+      document.querySelectorAll(".f-rating").forEach(e => e.classList.toggle("hide", task !== "rating"));
+      result.style.display = "none";
+    }));
+
+    function buildFeatures() {
+      const base = {
+        rated: $("rated").checked,
+        increment_code: $("increment_code").value,
+        opening_eco: $("opening_eco").value,
+        opening_ply: Number($("opening_ply").value),
+      };
+      if (task === "outcome") {
+        return { ...base,
+          white_rating: Number($("white_rating").value),
+          black_rating: Number($("black_rating").value) };
+      }
+      return { ...base,
+        turns: Number($("turns").value),
+        winner: $("winner").value,
+        victory_status: $("victory_status").value };
+    }
+
+    function renderOutcome(body) {
+      const order = ["white", "black", "draw"];
+      const bars = order.map(c => {
+        const p = body.probabilities[c] ?? 0;
+        const pct = (p * 100).toFixed(1);
+        return `<div class="bar-row">
+            <span class="bar-label">${c}</span>
+            <span class="bar-track"><span class="bar-fill ${c}" style="width:${pct}%"></span></span>
+            <span class="bar-pct">${pct}%</span></div>`;
+      }).join("");
+      result.innerHTML = `<p class="verdict">Most likely: <span style="color:var(--accent)">${body.prediction}</span></p>${bars}`;
+    }
+
+    function renderRating(body) {
+      result.innerHTML = `<p class="verdict">Estimated average rating</p>
+        <div class="rating-big">${Math.round(body.prediction)}</div>
+        <p class="note" style="margin-top:0">Elo · model MAE ≈ 179</p>`;
+    }
+
+    $("form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const btn = e.target.querySelector("button");
+      btn.disabled = true; btn.textContent = "Predicting…";
+      result.style.display = "block";
+      result.innerHTML = `<span class="note">Calling the model…</span>`;
+      try {
+        const res = await fetch("/predict", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ task, features: buildFeatures() }),
+        });
+        const body = await res.json();
+        if (!res.ok) {
+          result.innerHTML = `<span class="err">Error ${res.status}: ${JSON.stringify(body.detail ?? body)}</span>`;
+        } else if (task === "outcome") {
+          renderOutcome(body);
+        } else {
+          renderRating(body);
+        }
+      } catch (err) {
+        result.innerHTML = `<span class="err">Request failed: ${err.message}</span>`;
+      } finally {
+        btn.disabled = false; btn.textContent = "Predict";
+      }
+    });
+  </script>
+</body>
+</html>

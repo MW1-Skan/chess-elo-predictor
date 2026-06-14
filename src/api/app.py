@@ -20,11 +20,13 @@ from typing import Literal
 import joblib
 import pandas as pd
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from src import features as F
 
 MODELS_DIR = Path(__file__).resolve().parents[2] / "models"
+STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 # Defaults for columns required by engineer() but irrelevant to a given task; they
 # are dropped before the model sees them, so the value never affects a prediction.
@@ -101,6 +103,12 @@ def _build_row(features: GameFeatures, task: str) -> pd.DataFrame:
 
 
 app = FastAPI(title="Chess Elo Predictor", version="0.1.0")
+
+
+@app.get("/", include_in_schema=False)
+def index() -> FileResponse:
+    """Serve the single-page demo UI (a form that calls /predict)."""
+    return FileResponse(STATIC_DIR / "index.html")
 
 
 @app.get("/health")
