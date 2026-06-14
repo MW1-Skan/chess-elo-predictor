@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "pandas>=2.2",
+    "pyarrow>=17.0",        # parquet engine for processed data
     "scikit-learn>=1.5",
     "numpy>=1.26",
     "joblib>=1.4",
